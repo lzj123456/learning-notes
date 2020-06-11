@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration>
+
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!--全局属性，可以使用EL表达式取值-->
+    <property name="FILE_LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-4relative [%thread] %-5level %logger{35} - %msg%n"/>
+    <property name="LOG_FILE_PATH" value="f:/logs2"/>
+    <property name="APP_NAME" value="mall-admin"/>
+
+    <contextName>${APP_NAME}</contextName>
+
+    <appender name="fileAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!--临时日志文件打印的位置名字，可以使相对路径或绝对路径-->
+        <file>${LOG_FILE_PATH}/${APP_NAME}.log</file>
+        <!--基于时间的滚动策略-->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!--时间格式为yyyy-MM-dd代表没天一个文件-->
+            <fileNamePattern>${LOG_FILE_PATH}/${APP_NAME}-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <!--保留最近30的日志文件-->
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>3GB</totalSizeCap>
+        </rollingPolicy>
+        <!--日志打印格式-->
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!--	<logger name="com.btzh.bootdemo01" level="all">
+            <appender-ref ref="fileAppender"/>
+        </logger>-->
+
+    <!--打印整个项目的日志级别为info的日志信息-->
+    <root level="info">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="fileAppender"/>
+    </root>
+</configuration>
