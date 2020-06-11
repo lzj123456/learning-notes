@@ -30,7 +30,7 @@
         </encoder>
     </appender>
 
-    <!--	<logger name="com.btzh.bootdemo01" level="all">
+    <!--	<logger name="com.xxx.bootdemo01" level="all">
             <appender-ref ref="fileAppender"/>
         </logger>-->
 
