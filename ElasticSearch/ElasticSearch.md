@@ -4022,12 +4022,43 @@ input {
     record_last_run => true
     #上面运行结果的保存位置
     last_run_metadata_path => "jdbc-position.txt"
-    #每次从数据库中获取上次更新后的新数据
-    statement => "SELECT * FROM user where last_updated >:sql_last_value;"
-    #定时每一分钟读一次数据库，crontab表达式
+    #每次从数据库中获取上次更新后的新数据，如果追更字段是日期类型存在时区问题有8小时的时间差，
+    #解决办法就是在:sql_last_value时间基础上减去八小时
+    statement => "SELECT * FROM user where last_updated >     
+                    DATE_SUB(:sql_last_value,INTERVAL 8 HOUR);"
+    #如果追更字段是时间类型则需要调整时区
+    jdbc_default_timezone =>"Asia/Shanghai" 
+    #定时每一秒读一次数据库，crontab表达式
     schedule => " * * * * * *"
   }
 }
+
+filter {
+    json {
+        source => "message"
+        remove_field => ["message"]
+    }
+    
+    #将sql里的两个坐标字段指定数据格式
+    mutate {
+      convert => { "lon" => "float" }
+      convert => { "lat" => "float" }
+      convert => { "create_time" => "string" }
+    }
+  
+    #将两个坐标字段合并成一个字段
+    mutate {
+      rename => {
+          "lon" => "[location][lon]"
+          "lat" => "[location][lat]"
+      }
+    }
+
+    date {
+        match => ["create_time", "YYYY-MM-dd HH:mm:ss"]
+    }
+}
+
 output {
   elasticsearch {
     document_id => "%{id}"
