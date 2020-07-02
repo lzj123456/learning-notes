@@ -4063,7 +4063,7 @@ output {
   elasticsearch {
     document_id => "%{id}"
     document_type => "_doc"
-    index => "users"
+    index => "buildings"
     hosts => ["http://localhost:9200"]
   }
   stdout{
@@ -4072,8 +4072,52 @@ output {
 }
 ```
 
-3. 指定配置文件执行`./logstash -f ../config/logstash.conf`，它会每秒取mysql中查询一次users表的数据导入到ES中，然后我们在java程序中对user表进行CURD，ES就会感知到
-4. mysql中删除一条记录ES是感知不到的，所以需要使用标记删除的方式能够让ES把删除的记录更新过去，然后我们在ES中可以通过alias的方式把标记删除的记录过滤掉
+3. 如果导入的字段有坐标的话想利用es空间搜索就需要自定义索引模板，在模板中定义geo_point类型的字段
+
+   ```json
+   #默认的logstash索引模板是不会对坐标字段做特殊处理的，所以需要自己定义带有geo_point类型字段的索引模板
+   PUT _template/build_template
+   {
+     "index_patterns":["build*"],
+     "order":1,
+     "version":1,
+     "settings":{
+       "number_of_shards":1,
+       "number_of_replicas":1
+     },
+     "mappings":{
+       "properties":{
+         "address":{
+           "type" : "text",
+           "fields" : {
+             "keyword" : {
+               "type" : "keyword",
+               "ignore_above" : 256
+             }
+           }
+         },
+         "location":{
+           "type":"geo_point"
+         },
+         "create_time" : {
+           "type" : "date"
+         },
+         "del" : {
+           "type" : "long"
+         },
+         "id" : {
+           "type" : "long"
+         }
+       }
+     }
+   }
+   ```
+
+   
+
+4. 指定配置文件执行`nohup ./logstash -f ../config/logstash.conf > /dev/null &`，它会每秒取mysql中查询一次users表的数据导入到ES中，然后我们在java程序中对user表进行CURD，ES就会感知到
+
+5. mysql中删除一条记录ES是感知不到的，所以需要使用标记删除的方式能够让ES把删除的记录更新过去，然后我们在ES中可以通过alias的方式把标记删除的记录过滤掉
 
 ```json
 # 创建 alias，只显示没有被标记 deleted的用户信息
