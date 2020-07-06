@@ -451,7 +451,7 @@ dubbo内置了六种集群容错机制
 * Failfast：快速失败，消费者只发起一次调用若失败则立即报错
 * Failsafe：失败安全，当消费者调用提供者出现异常时直接忽略本次请求操作不报错
 * Failback：失败自动恢复，服务调用失败后，会把这次失败操作记录下来，定时重新请求
-* Forking：并行机制，消费者对于同一服务并行访问集群中所有机器，只要成功一个则立即返回结构
+* Forking：并行机制，消费者对于同一服务并行访问集群中所有机器，只要成功一个则立即返回结果
 * Broadcast：广播机制，广播调用所有服务提供者，有一个报错则直接报错，通常用于服务配置更新等
 
 1. Failover策略配置重试次数
@@ -477,7 +477,7 @@ dubbo内置了六种集群容错机制
 ### 6.1 mock null服务降级
 
 ```xml
-<!--check=false表示不去检测是否又该服务的提供者，mock=return null表式改服务直接返回null-->
+<!--check=false表示不去检测是否有该服务的提供者，mock=return null表式改服务直接返回null-->
 <dubbo:service ref="zfbService"
                     interface="com.abc.service.SomeService" check="false"
                		mock="return null"/>
@@ -567,7 +567,9 @@ dubbo内置了六种集群容错机制
 
 ## 8.声明式缓存
 
-开启缓存后，dubbo会把调用服务返回的结果进行缓存，当下次请求时直接取缓存中的内容，缓存容量默认是1000个，如果超过了1000个结果将采用LRU算法来移除最近最少使用的内容，这中缓存有个弊端就是没有更新缓存的机制，存储进去的内容最好是字典数据，经常不会发生改变的，否则一旦内容改变了缓存里的数据就成为了脏数据。
+开启缓存后，dubbo会把调用服务返回的结果进行缓存，
+
+当下次请求时直接取缓存中的内容，缓存容量默认是1000个，如果超过了1000个结果将采用LRU算法来移除最近最少使用的内容，这中缓存有个弊端就是没有更新缓存的机制，存储进去的内容最好是字典数据，经常不会发生改变的，否则一旦内容改变了缓存里的数据就成为了脏数据。
 
 ```xml
 <!--可以应用在服务或方法上，消费者端配置-->
@@ -672,6 +674,8 @@ public String test1() throws Exception {
 
 ## 13. SpringBoot中使用dubbo
 
+### 13.1 第一种方式
+
 1. 导入依赖
 
 ```xml
@@ -760,6 +764,80 @@ spring.application.name=boot-consumer
 spring.dubbo.registry=zookeeper://192.168.18.133:2181
 ```
 
+### 13.2 第二种方式
+
+保留XML的方式，我们在SpringBoot启动类上导入配置文件，并把启动自动配置的注解去掉
+
+```java
+@ImportResource({"classpath*:spring-consumer.xml"})
+@SpringBootApplication
+public class DubboApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(args);
+    }
+}
+```
+
+### 13.3 第三种方式
+
+使用注解方式进行配置，每个dubbo标签都有对应的Confg类
+
+```java
+/**
+ * dubbo配置类
+ */
+@Configuration
+public class DubboConfig {
+
+    // 对应dubbo的application标签
+    @Bean
+    public ApplicationConfig applicationConfig() {
+        ApplicationConfig applicationConfig = new ApplicationConfig();
+        applicationConfig.setName("项目名字");
+        return applicationConfig;
+    }
+
+    @Bean
+    public RegistryConfig registryConfig() {
+        RegistryConfig registryConfig = new RegistryConfig();
+        registryConfig.setId("zookeeper");
+        registryConfig.setAddress("zookeeper://192.168.18.133:2181");
+        return registryConfig;
+    }
+
+    @Bean
+    public ProviderConfig providerConfig() {
+        ProviderConfig providerConfig = new ProviderConfig();
+        providerConfig.setAsync(true);
+        return providerConfig;
+    }
+
+    @Bean
+    public ProtocolConfig protocolConfig() {
+        ProtocolConfig protocolConfig = new ProtocolConfig();
+        protocolConfig.setName("dubbo");
+        protocolConfig.setPort(20880);
+        protocolConfig.setAccepts(10);
+        return protocolConfig;
+    }
+    
+    @Bean
+    public ServiceConfig<SomeService> serviceConfig(SomeService someService) {
+        ServiceConfig<SomeService> serviceConfig = new ServiceConfig<SomeService>();
+        serviceConfig.setStub("com.abc.service.SomeServiceStub");
+        
+        // 服务下的方法级别配置
+        MethodConfig methodConfig = new MethodConfig();
+        methodConfig.setName("hello");
+        methodConfig.setTimeout(3000);
+        serviceConfig.setMethods(Arrays.asList(methodConfig));
+        return serviceConfig;
+    }
+}
+```
+
+
+
 ## 14. Dubbo配置优先级
 
 dubbo里面有很多功能可以配置在不同的位置，不同位置的优先级为下图所示：
@@ -788,6 +866,42 @@ Dubbo并没有使用JDK自带的SPI而是自己提供了这么一个SPI的支持
 2. 我们把自己写好的jar依赖到需要使用的工程中
 
 3. <dubbo:protocol name=”my” port=”20000” /> 配置使用的协议my就是我们自己实现组件的key
+
+## 16. 本地存根
+
+消费者调用提供者的服务前，可以在本地先校验参数是否有问题，参数没问题后再去调用远程服务，这就是本地存根的意思。
+
+```java
+/**
+ * 本地存根类，一般跟服务接口放在一起
+ * 
+ * @author lizijian
+ */
+public class SomeServiceStub implements SomeService {
+
+    private SomeService someService;
+    // 参数由dubbo传递
+    public SomeServiceStub(SomeService someService) {
+        this.someService = someService;
+    }
+    // 对接口方法做封装，参数校验没问题再去调用远程服务
+    public String hello(String param) {
+        if (!StringUtils.isEmpty(param)) {
+            return someService.hello(param);
+        }
+        return null;
+    }
+}
+```
+
+```xml
+<!--服务再引用的时候 配置上本地存根类全路径名-->
+<dubbo:reference id="zfbService"
+                 interface="com.abc.service.SomeService"
+                 stub="com.abc.service.SomeServiceStub"/>
+```
+
+
 
 # 三、源码解析
 
