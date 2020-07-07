@@ -76,6 +76,8 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY 'MyNewPass4!'
 grant all privileges on *.* to 'test1'@'localhost' with grant option;
 #刷新用户权限，权限改变后客户端要重新建立连接才生效，mysql会缓存当前连接的信息包括权限信息，所以服务端权限变更后客户端需要重新连接才能获取最新的权限信息。
 flush privileges;
+#默认root只能localhost访问，我们修改root可以允许用任何地址放问mysql
+update user set host='%' where user='root';
 #MySQL8需要修改客户端的认证方式，否则客户端连接时没有最新的认证插件后失败。
 alter user 'root'@'%' identified with mysql_native_password by 'MyNewPass4'; 
 ```
