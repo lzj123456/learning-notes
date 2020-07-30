@@ -78,3 +78,57 @@ Boolean mockWithTryException(@RequestBody InventoryDTO inventoryDTO);
 ```
 
 官方demo地址https://dromara.org/zh-cn/docs/hmily/quick-start-springcloud.html
+
+# 二、实现原理
+
+1. 使用的Spring AOP来对每一个加了@Hmily注解的方法做切面拦截，在切面中会根据事务上下文来进行判断当前切入点的角色，大致分为事务的发起者和事务的参与者，不同的角色使用不同的事务执行器进行切入点的执行处理。
+2. 事务发起者会也是真个分布式事务的协调者，他会在try阶段成功后调用所有事务参与者的confirm，失败则会调用所有参与者的cancel方法。
+
+```java
+// StarterHmilyTransactionHandler事务发起者的处理器，下面时核心处理方法源码
+public Object handler(final ProceedingJoinPoint point, 
+                      final HmilyTransactionContext context) throws Throwable {
+    Object returnValue;
+    try {
+        HmilyTransaction hmilyTransaction = this.hmilyTransactionExecutor.preTry(point);
+
+        try {
+            // 执行try阶段的业务
+            returnValue = point.proceed();
+            hmilyTransaction.setStatus(HmilyActionEnum.TRYING.getCode());
+            this.hmilyTransactionExecutor.updateStatus(hmilyTransaction);
+        } catch (Throwable var10) {
+            // 如果try阶段异常则执行所有事务参与者的cancel业务	
+            HmilyTransaction currentTransaction = this.hmilyTransactionExecutor
+                .getCurrentTransaction();
+            this.disruptorProviderManage.getProvider().onData(() -> {
+                this.hmilyTransactionExecutor.cancel(currentTransaction);
+            });
+            throw var10;
+        }
+
+        // 如果 try阶段成功则执行所有参与者的confirm方法
+        HmilyTransaction currentTransaction = this.hmilyTransactionExecutor
+            .getCurrentTransaction();
+        this.disruptorProviderManage.getProvider().onData(() -> {
+            this.hmilyTransactionExecutor.confirm(currentTransaction);
+        });
+    } finally {
+        HmilyTransactionContextLocal.getInstance().remove();
+        this.hmilyTransactionExecutor.remove();
+    }
+
+    return returnValue;
+}
+```
+
+# 三、使用TCC对业务性能的影响
+
+**影响性能的原因**：
+
+1. TCC本身对事务中的每个操作 都做了AOP切面处理这一步肯定时对性能有影响的
+2. 其次是协调者还需要去执行所有参与者的confirm或者cancel，这里也是对性能有影响的点
+
+**解决方案**：
+
+1. 由于Hmily的实现是基于事务的发起者作为整个分布式事务的协调者，事务发起者本身就是一个微服务，本身就是需要做集群的，我们只需要根据实际业务场景来添加实例数量就可以
