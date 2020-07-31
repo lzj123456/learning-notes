@@ -453,6 +453,17 @@ public IRule loadBalanceRule() {
 }
 ```
 
+## 5. Ribbon初始化配置
+
+```yml
+# 开启ribbon饥饿加载，防止第一次访问远程服务时因为初始化ribbon组件而导致超时
+ribbon:
+  eager-load:
+    enabled: true  
+```
+
+![1596179208993](SpringCloud/1596179222.png)
+
 # 五、SpringCloud Hystrix
 
 ## 1.介绍

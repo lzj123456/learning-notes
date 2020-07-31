@@ -224,6 +224,76 @@ Thread.sleep(30000);
 
 > zk实现的分布式锁要优于redis的实现，一般都会采取zk来实现分布式锁，因为zk实现的分布式锁采用监听回调的方式来重新获取锁，而redis则只能通过轮询的方式来重新获取锁，还有一个原因是zk实现的分布式锁可能有更强大的功能如共享锁并能提供排队的公平性这些都是redis里实现不了的。
 
+### 5.3 Curator实现分布式锁
+
+```java
+import java.util.concurrent.TimeUnit;
+import lombok.Cleanup;
+import lombok.SneakyThrows;
+import org.apache.curator.RetryPolicy;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.recipes.locks.InterProcessMutex;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.zookeeper.data.Stat;
+
+
+public class ZkLock {
+
+  @SneakyThrows
+  public static void main(String[] args) {
+
+    final String connectString = "localhost:2181,localhost:2182,localhost:2183";
+
+    // 重试策略，初始化每次重试之间需要等待的时间，基准等待时间为1秒。
+    RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+
+    // 使用默认的会话时间（60秒）和连接超时时间（15秒）来创建 Zookeeper 客户端
+    @Cleanup CuratorFramework client = CuratorFrameworkFactory.builder().
+        connectString(connectString).
+        connectionTimeoutMs(15 * 1000).
+        sessionTimeoutMs(60 * 100).
+        retryPolicy(retryPolicy).
+        build();
+
+    // 启动客户端
+    client.start();
+
+    final String lockNode = "/lock_node";
+    InterProcessMutex lock = new InterProcessMutex(client, lockNode);
+    try {
+      // 1. Acquire the mutex - blocking until it's available.
+      lock.acquire();
+
+      // OR
+
+      // 2. Acquire the mutex - blocks until it's available or the given time expires.
+      if (lock.acquire(60, TimeUnit.MINUTES)) {
+        Stat stat = client.checkExists().forPath(lockNode);
+        if (null != stat){
+          // Dot the transaction
+        }
+      }
+    } finally {
+      if (lock.isAcquiredInThisProcess()) {
+        lock.release();
+      }
+    }
+  }
+
+}
+```
+
+```xml
+<dependency>
+  <groupId>org.apache.curator</groupId>
+  <artifactId>curator-recipes</artifactId>
+  <version>2.8.0</version>
+</dependency>
+```
+
+
+
 ## 6.分布式队列
 
 ### 6.1 FIFO队列

@@ -695,7 +695,44 @@ public static void releaseLock(String lockKey, String requestId) {
 }
 ```
 
+## 3.redisson开源框架
 
+### 3.1 使用
+
+```xml
+<dependency>
+   <groupId>org.redisson</groupId>
+   <artifactId>redisson</artifactId>
+   <version>3.13.2</version>
+</dependency>  
+```
+
+```java
+// 1. Create config object
+Config config = new Config();
+config.useClusterServers()
+       // use "rediss://" for SSL connection
+      .addNodeAddress("redis://127.0.0.1:7181");
+
+// 2. Create Redisson instance
+RedissonClient redisson = Redisson.create(config);	
+// 4. Get Redis based Lock
+RLock lock = redisson.getLock("myLock");
+```
+
+### 3.2 基本原理
+
+1. 在获取锁的时候会执行一个lua脚本，在redis中创建一个锁指定的key，然后value是锁持有者的编号
+2. 当获取锁的时候发现这个锁对应的key已经存在了说明锁已被持有，就需要轮询等待锁资源
+3. 当获取到锁后，尺有锁的程序还会启动一个看门狗线程，这个线程用来完成锁的续租，他会起一个定时任务，定时去发送一个lua脚本到redis查看锁是否还被持有，如果被持有就续一下过期时间
+4. 当锁释放时就会把key删除掉，等待锁的程序就会获取到锁
+5. 如果持有锁的程序挂掉了，那么看门狗线程也会停止运行，那么锁超时后也还是可以被其他程序获取到的。
+
+### 3.3 相关问题
+
+redis集群中如果master挂掉了，这时slave里还没有通过锁的信息，就会导致会同时有两个程序获取到锁
+
+解决方案：在获取锁的时候要保证锁的key同时在master和slave中都保存成功。
 
 # 六、持久化方案
 
