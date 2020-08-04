@@ -607,6 +607,10 @@ Xms Xmx 为物理机内存的一半，例如：服务器内存8G，JVM内存配�
 
 如果再程序中调用了System.gc()会有可能频繁出发Full GC，有一些第三方依赖中类库中也会使用System.gc(),例如**JXL**工具包在读取excel后调用close()时会调用System.gc()，如果我们发现GC日志中有频繁的System.gc()触发的Full GC时可以对代码进行排序时候有调用System.gc()的情况，我们可以更改代码，也可以直接使用JVM参数`-XX:DisableExplicitGC`直接禁用对System.gc()的支持
 
+### 3.2 集合容量没控制好
+
+有可能集合容量没控制好导致DB查询出大量的数据沾满内存导致GC频发 
+
 ## 4.内存溢出
 
 1. 保留现场，jmap -dump:format=b,file=filename.hprof -F PID, 导出内存快照到文件，-F强制执行，内存不够用时可能不会立即执行jmap需要使用-F强制执行
