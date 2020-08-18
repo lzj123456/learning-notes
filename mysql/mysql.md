@@ -792,6 +792,11 @@ bin log日志有三种模式，分别如下
 
 > show global variables like "%binlog_format%"; 查看bin log日志模式
 
+## 1.7 主从一致性校验
+
+1. 首先在zabbix中有监控主从的延迟时间，这个本身就有一定的校验功能，但是不能确保主从数据一定是一致的
+2. 还可以使用pt-table-checknum工具做一致性校验，以及使用pt-table-sync工具做修复
+
 ## 2.mysql-proxy读写分离
 
 ### 2.1 架构配置

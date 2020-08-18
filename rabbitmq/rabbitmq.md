@@ -551,3 +551,7 @@ disk_free_limit.absolute=50mb
 ```
 
 > 在线上环境中如果发现mq处于阻塞状态，可以看下预警信息是不是内存或者磁盘预警了
+
+# 附录
+
+相关面试题 https://blog.csdn.net/jerryDzan/article/details/89183625 
